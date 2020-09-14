@@ -5,31 +5,45 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  WsResponse,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
-import { Socket, Server } from 'socket.io';
+import { Socket } from 'socket.io';
+import { Server } from 'ws';
 
-@WebSocketGateway()
-export class AppGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+@WebSocketGateway({ namespace: '/chat' })
+export class MessageGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+
   @WebSocketServer() server: Server;
 
-  private logger: Logger = new Logger('AppGateway');
+  private logger: Logger = new Logger('MessageGateway');
 
   @SubscribeMessage('msgToServer')
-  handleMessage(client: Socket, payload: string): void {
-    this.server.emit('msgToClient', payload);
+  public handleMessage(client: Socket, payload: any): Promise<WsResponse<any>> {
+    return this.server.to(payload.room).emit('msgToClient', payload);
   }
 
-  afterInit(server: Server) {
-    this.logger.log('Init');
+  @SubscribeMessage('joinRoom')
+  public joinRoom(client: Socket, room: string): void {
+    client.join(room);
+    client.emit('joinedRoom', room);
   }
 
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+  @SubscribeMessage('leaveRoom')
+  public leaveRoom(client: Socket, room: string): void {
+    client.leave(room);
+    client.emit('leftRoom', room);
   }
 
-  handleConnection(client: Socket, ...args: any[]) {
-    this.logger.log(`Client connected: ${client.id}`);
+  public afterInit(server: Server): void {
+    return this.logger.log('Init');
+  }
+
+  public handleDisconnect(client: Socket): void {
+    return this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  public handleConnection(client: Socket): void {
+    return this.logger.log(`Client connected: ${client.id}`);
   }
 }

@@ -1,98 +1,71 @@
 version: '3.7'
+# all the containers have to declare inside services
 services:
-  ingameitemapp:
+  # App service
+  nestchat:
+    # application rely on redis running
     depends_on:
-      - db
-      - elasticsearch
+      - redis
+    # this build context will take the commands from Dockerfile
     build:
       context: .
       dockerfile: Dockerfile
-    image: in-game-item-docker
-    container_name: ingameitemapp
+    # image name
+    image: nest-chat-realtime-docker
+    # container name
+    container_name: nestchat
+    # always restart the container if it stops.
     restart: always
+    # docker run -t is allow
     tty: true
+    # application port, this is take value from env file
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
-    working_dir: /var/www/in-game-item-api
+    # working directory
+    working_dir: /var/www/nest-chat-realtime
+    # application environment
     environment:
-      SERVICE_NAME: ingameitemapp
+      SERVICE_NAME: nestchat
       SERVICE_TAGS: dev
-      SERVICE_DB_HOST: ${DATABASE_HOST}:${DATABASE_PORT}
-      SERVICE_DB_USER: ${DATABASE_USERNAME}
-      SERVICE_DB_PASSWORD: ${DATABASE_PASSWORD}
-      SERVICE_ES_HOST: ${ELASTIC_SEARCH_HOST}:${ELASTIC_SEARCH_PORT}
-      ELASTICSEARCH_URL: ${ELASTIC_SEARCH_URL}
-      VIRTUAL_HOST: ${VIRTUAL_HOST}
-      VIRTUAL_PORT: ${SERVER_PORT}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_HOST: ${REDIS_HOST}
+    # save (persist) data and also to share data between containers
     volumes:
-      - ./:/var/www/in-game-item-api
-      - /var/www/in-game-item-api/node_modules
+      - ./:/var/www/nest-chat-realtime
+      - /var/www/nest-chat-realtime/node_modules
+      # application network, each container for a service joins this network
     networks:
-      - game-item-network
-
-  nginx-proxy:
-    image: jwilder/nginx-proxy:alpine
-    container_name: nginx-proxy
-    restart: unless-stopped
-    tty: true
+      - nest-chat-network
+  # Redis service
+  redis:
+    # image name
+    image: redis:latest
+    # container name
+    container_name: redis
+    # execute the command once start redis container
+    command: [
+        "redis-server",
+        "--bind",
+        "redis",
+        "--port",
+        "6379"
+    ]
+    # save (persist) data and also to share data between containers
+    volumes:
+      - red_data:/var/lib/redis
+    # redis port, this is take value from env file
     ports:
-      - "${NGINX_PORT}:${NGINX_PORT}"
-      - "${NGINX_SSL_PORT}:${NGINX_SSL_PORT}"
-    volumes:
-      - ./:/var/www/in-game-item-api
-      - ./nginx/conf.d/:/etc/nginx/conf.d/
-    depends_on:
-      - ingameitemapp
+      - '${REDIS_PORT}:${REDIS_PORT}'
+      # application network, each container for a service joins this network
     networks:
-      - game-item-network
-
-  db:
-    image: mariadb
-    restart: always
-    volumes:
-      - db_data:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DATABASE_PASSWORD}
-      MYSQL_USER: ${DATABASE_USERNAME}
-      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
-      MYSQL_DATABASE: ${DATABASE_NAME}
-    expose:
-      - "${DATABASE_PORT}"
-    ports:
-      - "${DATABASE_PORT}:${DATABASE_PORT}"
-    networks:
-      - game-item-network
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.0
-    container_name: elasticsearch
-    environment:
-      - node.name=elasticsearch
-      - http.port=9200
-      - http.host=0.0.0.0
-      - transport.host=127.0.0.1
-      - cluster.name=es-docker-cluster
-      - discovery.seed_hosts=elasticsearch
-      - cluster.initial_master_nodes=elasticsearch
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-      - es_data:/var/lib/elasticsearch
-    ports:
-      - "${ELASTIC_SEARCH_PORT}:${ELASTIC_SEARCH_PORT}"
-    networks:
-      - game-item-network
+      - nest-chat-network
 
   #Docker Networks
 networks:
-  game-item-network:
-    external:
-      name: nginx-proxy
+  # All container connect in a network
+  nest-chat-network:
     driver: bridge
+# save (persist) data
 volumes:
-  db_data: {}
-  es_data: {}
+  red_data: {}
+

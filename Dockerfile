@@ -1,26 +1,29 @@
+# Pull node image from docker hub
 FROM node:10-alpine
 
-# Install PM2
-RUN npm install -g pm2
+# Set working directory
+RUN mkdir -p /var/www/nest-chat-realtime
+WORKDIR /var/www/nest-chat-realtime
 
-RUN mkdir -p /var/www/in-game-item-api
-WORKDIR /var/www/in-game-item-api
-
-ENV PATH /var/www/in-game-item-api/node_modules/.bin:$PATH
-RUN adduser --disabled-password gameskill
+# add `/usr/src/app/node_modules/.bin` to $PATH
+ENV PATH /var/www/nest-chat-realtime/node_modules/.bin:$PATH
+# create user with no password
+RUN adduser --disabled-password chat
 
 # Copy existing application directory contents
-COPY . /var/www/in-game-item-api
-COPY package.json /var/www/in-game-item-api/package.json
-COPY package-lock.json /var/www/in-game-item-api/package-lock.json
+COPY . /var/www/nest-chat-realtime
+# install and cache app dependencies
+COPY package.json /var/www/nest-chat-realtime/package.json
+COPY package-lock.json /var/www/nest-chat-realtime/package-lock.json
 
-RUN chown -R gameskill:gameskill /var/www/in-game-item-api
-USER gameskill
+# grant a permission to the application
+RUN chown -R chat:chat /var/www/nest-chat-realtime
+USER chat
 
+# clear application caching
 RUN npm cache clean --force
+# install all dependencies
 RUN npm install
 
-EXPOSE 3009
-#CMD [ "npm", "run", "pm2-delete" ]
-#CMD [ "npm", "run", "build-docker-dev" ]
+EXPOSE 3004
 CMD [ "npm", "run", "start:dev" ]
